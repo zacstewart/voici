@@ -1,0 +1,46 @@
+doctype html
+html
+  head
+    title Voici
+    link rel="stylesheet" href="css/bootstrap.css"
+    script src="javascripts/zepto.js"
+    script src="javascripts/underscore.js"
+    script src="javascripts/backbone.js"
+  body
+    script#app type="text/html"
+      .container
+        .row
+          .span12#header
+            .page-header
+              h1 Voici
+        .row
+          .span3#sidebar
+            a#new_invoice_btn href="#new_invoice" class="btn btn-success" New Invoice
+          .span9#main Content
+    script#invoice_template type="text/html"
+      asdf
+    script#edit_invoice type="text/html"
+      .modal
+        .modal-header
+          a.close data-dismiss="modal" &times;
+          h3 New Invoice
+        .modal-body
+          label for="date" Invoice Date
+          input type="text" name="date" value="<%= date %>"
+          label for="number" Invoice Number
+          input type="text" name="number" value="<%= number %>"
+          table.table
+            thead
+              tr
+                th Description
+                th Quantity
+                th Unit Price
+                th Line Price
+            tbody#line_items
+        .modal-footer
+          a.btn.btn-primary href="#save" Save
+    script src="voici.js"
+    javascript:
+      initApp({
+        invoices: #{{@invoices.to_json}}
+      });
