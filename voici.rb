@@ -26,6 +26,7 @@ class Voici < Sinatra::Base
     field :number,  typw: String
     #embeds_many :line_items
     #accepts_nested_attributes_for :line_items
+    validates_presence_of :date, :number
   end
 
   get '/' do
@@ -37,12 +38,12 @@ class Voici < Sinatra::Base
     coffee :voici
   end
 
-  get '/invoices.?:format?' do
+  get '/invoices' do
     content_type :json
     Invoice.all.to_json
   end
 
-  post '/invoices.?:format?' do
+  post '/invoices' do
     invoice = JSON.parse(request.body.read)
     @invoice = Invoice.new(
       date: invoice['date'],
@@ -52,7 +53,7 @@ class Voici < Sinatra::Base
     if @invoice.save
       @invoice.to_json
     else
-      'Fail!'
+      raise "Vailed to create invoice"
     end
   end
 
@@ -60,5 +61,25 @@ class Voici < Sinatra::Base
     invoice = Invoice.find(params[:id])
     content_type :json
     invoice.to_json
+  end
+
+  put '/invoices/:id' do
+    invoice_params = JSON.parse(request.body.read)
+    invoice = Invoice.find(params[:id])
+    if invoice.update_attributes(invoice_params)
+      invoice.to_json
+    else
+      raise "Failed to update invoice"
+    end
+  end
+
+  delete '/invoices/:id' do
+    invoice = Invoice.find(params[:id])
+    content_type :json
+    if invoice.destroy
+      invoice.to_json
+    else
+      raise "Failed to delete invoice"
+    end
   end
 end

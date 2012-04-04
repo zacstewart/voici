@@ -1,7 +1,10 @@
 class @Invoice extends Backbone.Model
+  idAttribute: "_id"
   defaults:
     date: new Date()
     number: ''
+  urlRoot: ->
+    '/invoices'
 class @LineItem extends Backbone.Model
 
 class @Invoices extends Backbone.Collection
@@ -11,59 +14,105 @@ class @Invoices extends Backbone.Collection
 class @LineItems extends Backbone.Collection
   model: LineItem
 
-class @InvoiceView extends Backbone.View
+class @InvoiceListView extends Backbone.View
   tagName: 'li'
   template: _.template $('#invoice_template').html()
+  events:
+    'click' : 'show'
   initialize: ->
     @model.on 'change', =>
       @render()
     @model.on 'destroy', =>
       @remove()
   render: ->
-    @$el.html @template(@model.toJSON())
+    @$el.html(@template(@model.toJSON())).data('id', @model.id)
     this
-
+  show: (e) ->
+    view = new ShowInvoiceView
+      model: @model
+    view.display()
+class @ShowInvoiceView extends Backbone.View
+  initialize: ->
+    @model.on 'change', =>
+      @render()
+  tagName: 'div'
+  template: _.template($('#show_invoice_template').html())
+  events:
+    'click a[data-dismiss="modal"]': 'close'
+    'click a[href="#delete"]': 'delete'
+    'click a[href="#edit"]': 'edit'
+  render: ->
+    @$el.html(@template(@model.toJSON()))
+    this
+  display: ->
+    @render().$el.appendTo('body')
+    this
+  delete: (e) ->
+    e.preventDefault()
+    @model.destroy
+      success: =>
+        @close()
+  edit: (e) ->
+    e.preventDefault() if e?
+    view = new EditInvoiceView
+      model: @model
+    view.display()
+    @close()
+  close: ->
+    @remove()
 class @EditInvoiceView extends Backbone.View
-  template: _.template($('#edit_invoice').html())
+  initialize: ->
+    @model.on 'sync', (trigger, etc) ->
+  template: _.template($('#edit_invoice_template').html())
+  tagName: 'div'
   events:
     'change': 'updateModel'
     'click a[data-dismiss="modal"]': 'close'
     'click a[href="#save"]': 'save'
   render: ->
-    @$el.html(@template(@model.toJSON())).appendTo('body')
+    @$el.html(@template(@model.toJSON()))
+    this
+  display: ->
+    @render().$el.appendTo('body')
   updateModel: (e) ->
-    console.log e
     @model.set
       date: @$el.find('input[name=date]').val()
       number: @$el.find('input[name=number]').val()
   close: (e) ->
-    e.preventDefault()
+    e.preventDefault() if e?
+    @model.destroy if @model.isNew()
     @remove()
   save: (e) ->
     e.preventDefault()
-    invoices.add(@model)
-    @model.save()
-
+    @model.save null,
+      success: =>
+        invoices.add @model
+        @close()
 class @InvoicesView extends Backbone.View
   initialize: ->
-    @collection.on 'all', =>
-      @render()
+    @collection.on 'reset', =>
+      @addAll()
+    @collection.on 'add', (invoice) =>
+      @addOne(invoice)
   render: ->
     @$el.html()
-    @collection.each (invoice) ->
-      $('#main').append @make('li')
-
+  addOne: (invoice) ->
+    view = new InvoiceListView
+      model: invoice
+    $('#main').append view.render().el
+  addAll: ->
+    invoices.each (invoice) =>
+      @addOne invoice
 class @BaseView extends Backbone.View
-  template: _.template($('#app').remove().html())
+  initialize: ->
+    @setElement($('#voici'))
   events:
     'click #new_invoice_btn': 'newInvoice'
-  render: ->
-    @$el.html(@template()).appendTo('body')
   newInvoice: (e) ->
     e.preventDefault()
     view = new EditInvoiceView
       model: new Invoice
-    view.render()
+    view.display()
 class @AppRouter extends Backbone.Router
   initialize: ->
   routes:
@@ -73,10 +122,11 @@ class @AppRouter extends Backbone.Router
 
 @initApp = (args={}) =>
   # Collections
-  @invoices = new Invoices(args.invoices)
+  @invoices = new Invoices()
   # Views
   @baseView = new BaseView()
   @invoicesView = new InvoicesView
     collection: @invoices
+  @invoices.reset args.invoices
   @router = new AppRouter()
   Backbone.history.start()
