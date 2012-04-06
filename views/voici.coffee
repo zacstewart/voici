@@ -118,7 +118,6 @@ class @EditInvoiceView extends Backbone.View
   template: _.template($('#edit_invoice_template').html())
   tagName: 'div'
   events:
-    'change': 'updateModel'
     'click a[data-dismiss="modal"]': 'close'
     'click a[href="#save"]': 'save'
     'click a[href="#new_item"]': 'newItem'
@@ -128,10 +127,6 @@ class @EditInvoiceView extends Backbone.View
     this
   display: ->
     @render().$el.appendTo('body')
-  updateModel: (e) ->
-    @model.set
-      date: @$el.find('input[name=date]').val()
-      number: @$el.find('input[name=number]').val()
   close: (e) ->
     e.preventDefault() if e?
     @model.destroy if @model.isNew()
@@ -139,10 +134,14 @@ class @EditInvoiceView extends Backbone.View
     @remove()
   save: (e) ->
     e.preventDefault()
-    @model.save null,
+    @model.save({
+        date: @$el.find('input[name=date]').val()
+        number: @$el.find('input[name=number]').val()
+      },
       success: =>
         invoices.add @model
         @close()
+    )
   addOneItem: (item) ->
     view = new EditLineItemView
       model: item
