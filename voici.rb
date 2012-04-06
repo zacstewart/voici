@@ -2,36 +2,34 @@ require 'sinatra'
 require 'json'
 require 'mongoid'
 require 'slim'
+class LineItem
+  include Mongoid::Document
+  field :description, type: String
+  field :quantity,    type: Float
+  field :unit_price,  type: Float
+  embedded_in :invoice
+
+  def total_price
+    self.unit_price * self.quantity
+  end
+end
+
+class Invoice
+  include Mongoid::Document
+  include Mongoid::MultiParameterAttributes
+  field :date,    type: Date
+  field :number,  typw: String
+  embeds_many :line_items
+  accepts_nested_attributes_for :line_items
+  validates_presence_of :date, :number
+end
 
 class Voici < Sinatra::Base
   Mongoid.load!("config/mongoid.yml")
   set :public_folder, File.dirname(__FILE__) + '/static'
 
-  class LineItem
-    include Mongoid::Document
-    field :description, type: String
-    field :quantity,    type: Float
-    field :unit_price,  type: Float
-    embedded_in :invoice
-
-    def total_price
-      self.unit_price * self.quantity
-    end
-  end
-
-  class Invoice
-    include Mongoid::Document
-    include Mongoid::MultiParameterAttributes
-    field :date,    type: Date
-    field :number,  typw: String
-    #embeds_many :line_items
-    #accepts_nested_attributes_for :line_items
-    validates_presence_of :date, :number
-  end
-
   get '/' do
-    @invoices = Invoice.all || []
-    slim :index
+    slim :index, locals: {invoices: all_invoices}
   end
 
   get '/voici.js' do
@@ -39,47 +37,56 @@ class Voici < Sinatra::Base
   end
 
   get '/invoices' do
-    content_type :json
-    Invoice.all.to_json
+    invoices = Invoice.all
+    deliver invoices
   end
 
   post '/invoices' do
-    invoice = JSON.parse(request.body.read)
-    @invoice = Invoice.new(
-      date: invoice['date'],
-      number: invoice['number']
-    )
-    content_type :json
-    if @invoice.save
-      @invoice.to_json
+    invoice = Invoice.new payload
+    if invoice.save
+      deliver invoice
     else
-      raise "Vailed to create invoice"
+      raise "Failed to create invoice"
     end
   end
 
-  get '/invoices/:id' do
-    invoice = Invoice.find(params[:id])
-    content_type :json
-    invoice.to_json
+  get '/invoices/:invoice_id' do
+    deliver find_invoice
   end
 
-  put '/invoices/:id' do
-    invoice_params = JSON.parse(request.body.read)
-    invoice = Invoice.find(params[:id])
-    if invoice.update_attributes(invoice_params)
-      invoice.to_json
+  put '/invoices/:invoice_id' do
+    if find_invoice.update_attributes(payload)
+      deliver find_invoice
     else
       raise "Failed to update invoice"
     end
   end
 
-  delete '/invoices/:id' do
-    invoice = Invoice.find(params[:id])
-    content_type :json
-    if invoice.destroy
-      invoice.to_json
+  delete '/invoices/:invoice_id' do
+    if find_invoice.destroy
+      deliver find_invoice
     else
       raise "Failed to delete invoice"
     end
+  end
+
+  private
+
+  def payload
+    JSON.parse(request.body.read)
+  end
+
+  def deliver(content)
+    content_type :json
+    content.to_json
+  end
+
+  def all_invoices
+    Invoice.all
+  end
+
+  def find_invoice
+    #TODO: access control
+    @_invoice ||= Invoice.find(params[:invoice_id])
   end
 end
