@@ -112,7 +112,6 @@ class @ShowInvoiceView extends Backbone.View
     @remove()
 class @EditInvoiceView extends Backbone.View
   initialize: ->
-    @model.on 'sync', (trigger, etc) ->
     @model.lineItems.on 'add', (item) =>
       @addOneItem(item)
   template: _.template($('#edit_invoice_template').html())
@@ -129,7 +128,7 @@ class @EditInvoiceView extends Backbone.View
     @render().$el.appendTo('body')
   close: (e) ->
     e.preventDefault() if e?
-    @model.destroy if @model.isNew()
+    @model.destroy() if @model.isNew()
     @undelegateEvents()
     @remove()
   save: (e) ->
