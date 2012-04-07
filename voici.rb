@@ -1,3 +1,6 @@
+require 'bundler'
+Bundler.require
+
 class User
   include Mongoid::Document
   field :email,               type: String
