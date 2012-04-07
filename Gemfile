@@ -1,6 +1,6 @@
 source :rubygems
 
-gem 'bcrypt-ruby'
+gem 'bcrypt-ruby', :require => 'bcrypt'
 gem 'bson_ext'
 gem 'coffee-script'
 gem 'jbuilder'
@@ -9,4 +9,6 @@ gem 'rack'
 gem 'sass'
 gem 'sinatra'
 gem 'slim'
+gem 'sprockets'
+gem 'uglifier'
 gem 'warden'

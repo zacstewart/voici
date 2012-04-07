@@ -5,7 +5,7 @@ use Warden::Manager do |manager|
   manager.failure_app = Voici
 end
 Warden::Manager.serialize_into_session{|user| user.id }
-Warden::Manager.serialize_from_session{|id| User.get(id) }
+Warden::Manager.serialize_from_session{|id| User.find(id) }
 Warden::Manager.before_failure do |env,opts|
   # Sinatra is very sensitive to the request method
   # since authentication could fail on any type of method, we need
@@ -30,4 +30,10 @@ Warden::Strategies.add(:password) do
   def payload
     @_payload ||= JSON.parse(request.body.read).symbolize_keys
   end
+end
+map '/assets' do
+  run Voici.sprockets
+end
+map '/' do
+  run Voici
 end

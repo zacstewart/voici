@@ -80,7 +80,7 @@ html
         td <%= quantity %>
         td <%= unit_price %>
         td <%= line_price %>
-    script src="voici.js"
+    script src="#{{asset_path('application.js')}}"
     javascript:
       initApp({
         invoices: #{{invoices.to_json}}
