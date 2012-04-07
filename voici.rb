@@ -24,6 +24,13 @@ class User
   def password=(pass)
     self.encrypted_password = pass.nil? ? nil : ::BCrypt::Password.create(pass)
   end
+
+  def serializable_hash(opts={})
+    {
+      _id: id,
+      email: email
+    }
+  end
 end
 
 class LineItem
@@ -48,16 +55,38 @@ class Invoice
   validates_presence_of :date, :number
 end
 
+module AssetHelpers
+  def asset_path(source)
+    '/assets/' << settings.sprockets.find_asset(source).digest_path
+  end
+end
+
 class Voici < Sinatra::Base
-  Mongoid.load!("config/mongoid.yml")
+  set :root, File.dirname(__FILE__)
   set :public_folder, File.dirname(__FILE__) + '/static'
+  set :sprockets, Sprockets::Environment.new(root)
+  set :precompile, [ /\w+\.(?!js|css).+/, /application.(css|js)$/ ]
+  set :assets_prefix, 'assets'
+  set :assets_path, File.join(root, assets_prefix)
+  Mongoid.load!('config/mongoid.yml')
+
+  configure do
+    sprockets.append_path(File.join(root, 'assets', 'stylesheets'))
+    sprockets.append_path(File.join(root, 'assets', 'javascripts'))
+    sprockets.append_path(File.join(root, 'assets', 'images'))
+    sprockets.context_class.instance_eval { include AssetHelpers }
+  end
+
+  helpers do
+    include AssetHelpers
+
+    def current_user
+      warden.user
+    end
+  end
 
   get '/' do
     slim :index, locals: {invoices: all_invoices}
-  end
-
-  get '/voici.js' do
-    coffee :voici
   end
 
   get '/invoices' do
@@ -126,10 +155,6 @@ class Voici < Sinatra::Base
   # State
   def warden
     @_warden ||= env['warden']
-  end
-
-  def current_user
-    warden.user
   end
 
   # Request

@@ -11,11 +11,28 @@ html
       .row
         .span12#header
           .page-header
-            h1 Voici
+            .row
+              .span8
+                h1 Voici
+              #session.span4
+            .clearfix
       .row
         .span3#sidebar
           a#new_invoice_btn href="#new_invoice" class="btn btn-success" New Invoice
         .span9#main
+    script#sign_in_template type="text/html"
+      form#new_session.form-inline.pull-right
+        input.input-small type="text" name="email" placeholder="Email"
+        input.input-small type="password" name="password" placeholder="Password"
+        input.btn.btn-primary type="submit" value="Go"
+    script#current_user_template type="text/html"
+      .btn-group.pull-right
+        a.btn.dropdown-toggle
+          | <%= email %>
+          .caret
+        ul.dropdown-menu
+          li
+            a href="#sign_out" Sign out
     script#invoice_template type="text/html"
       div Number: <%= number %>
     script#edit_invoice_template type="text/html"
@@ -83,5 +100,6 @@ html
     script src="#{{asset_path('application.js')}}"
     javascript:
       initApp({
+        current_user: #{{current_user.to_json}},
         invoices: #{{invoices.to_json}}
       });
