@@ -1,9 +1,7 @@
 source :rubygems
 
-gem 'rack'
-gem 'sinatra'
-gem 'jbuilder'
-gem 'mongoid'
+gem 'bcrypt-ruby'
 gem 'bson_ext'
 gem 'coffee-script'
 gem 'slim'
+gem 'warden'

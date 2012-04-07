@@ -1,7 +1,27 @@
-require 'sinatra'
-require 'json'
-require 'mongoid'
-require 'slim'
+class User
+  include Mongoid::Document
+  field :email,               type: String
+  field :encrypted_password,  type: String
+  attr_accessor :password, :password_confirmation
+  validates_confirmation_of :password
+  validates_presence_of :encrypted_password
+
+  def self.authenticate(email, pass)
+    self.find_by_email_and_encry
+  end
+
+  def encrypted_password
+    @encrypted_password ||= begin
+      ep = read_attribute(:encrypted_password)
+      ep.nil? ? nil : ::BCrypt::Password.new(ep)
+    end
+  end
+
+  def password=(pass)
+    self.encrypted_password = pass.nil? ? nil : ::BCrypt::Password.create(pass)
+  end
+end
+
 class LineItem
   include Mongoid::Document
   field :description, type: String
@@ -70,17 +90,56 @@ class Voici < Sinatra::Base
     end
   end
 
-  private
-
-  def payload
-    JSON.parse(request.body.read)
+  get '/users' do
+    deliver User.all
   end
 
+  post '/users' do
+    user = User.new(payload)
+    if user.save
+      user
+    else
+      status 406
+    end
+  end
+
+  post '/unauthenticated/?' do
+    status 401
+    deliver "Not authorized!"
+  end
+
+  post '/session' do
+    warden.authenticate! :password
+    deliver current_user
+  end
+
+  delete '/session' do
+    warden.logout
+    deliver "That's all folks!"
+  end
+
+  private
+  # State
+  def warden
+    @_warden ||= env['warden']
+  end
+
+  def current_user
+    warden.user
+  end
+
+  # Request
+  def payload
+    JSON.parse(request.body.read).symbolize_keys
+  end
+
+  # Response
   def deliver(content)
     content_type :json
     content.to_json
   end
 
+  # Resources
   def all_invoices
     Invoice.all
   end
