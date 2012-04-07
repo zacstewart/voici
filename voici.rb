@@ -1,5 +1,6 @@
 require 'bundler'
 Bundler.require
+set :logging, :true
 
 class User
   include Mongoid::Document
