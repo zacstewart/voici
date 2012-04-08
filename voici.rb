@@ -104,7 +104,7 @@ class Voici < Sinatra::Base
 
   get '/' do
     bootstrap = {current_user: current_user}
-    bootstrap[:invoices] = current_user.invoices if current_user
+    bootstrap[:invoices] = current_user.invoices.all if current_user
     slim :index, locals: {bootstrap: bootstrap}
   end
 
@@ -145,7 +145,7 @@ class Voici < Sinatra::Base
   post '/users' do
     user = User.new(payload)
     if user.save
-      user
+      deliver user
     else
       status 406
     end
@@ -174,7 +174,7 @@ class Voici < Sinatra::Base
 
   # Request
   def payload
-    @_payload ||= HashWithIndifferentAccess.new JSON.parse(request.body.read).symbolize_keys
+    @_payload ||= HashWithIndifferentAccess.new JSON.parse(request.body.read)
   end
 
   # Response
@@ -184,12 +184,9 @@ class Voici < Sinatra::Base
   end
 
   # Resources
-  def all_invoices
-    Invoice.all
-  end
 
   def find_invoice
     #TODO: access control
-    @_invoice ||= Invoice.find(params[:invoice_id])
+    @_invoice ||= current_user.invoices.find(params[:invoice_id])
   end
 end

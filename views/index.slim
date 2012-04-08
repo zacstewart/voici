@@ -2,7 +2,7 @@ doctype html
 html
   head
     title Voici
-    link rel="stylesheet" href="css/bootstrap.css"
+    link rel="stylesheet" href="#{{asset_path('application.css')}}"
   body#voici
     .container
       .row
@@ -48,7 +48,7 @@ html
             h3 New Invoice
           .modal-body
             label for="date" Invoice Date
-            input type="text" name="date" value="<%= date %>"
+            input type="text" name="date" data-role="date" value="<%= date %>"
             label for="number" Invoice Number
             input type="text" name="number" value="<%= number %>"
             table.table

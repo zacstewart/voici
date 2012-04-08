@@ -66,6 +66,7 @@ class @EditInvoiceView extends Backbone.View
   render: ->
     @$el.html(@template(@model.toJSON()))
     @addAllItems()
+    @$el.find('[data-role="date"]').datepicker()
     this
   display: ->
     @render().$el.appendTo('body')
