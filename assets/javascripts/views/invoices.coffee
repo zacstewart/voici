@@ -1,5 +1,5 @@
 class @InvoiceListView extends Backbone.View
-  tagName: 'li'
+  tagName: 'tr'
   template: _.template $('#invoice_template').html()
   events:
     'click' : 'show'
@@ -9,7 +9,7 @@ class @InvoiceListView extends Backbone.View
     @model.on 'destroy', =>
       @remove()
   render: ->
-    @$el.html(@template(@model.toJSON())).data('id', @model.id)
+    @$el.html(@template(@model.toJSON()))
     this
   show: (e) ->
     view = new ShowInvoiceView
@@ -96,16 +96,18 @@ class @EditInvoiceView extends Backbone.View
     @model.lineItems.add new LineItem()
 class @InvoicesView extends Backbone.View
   initialize: ->
+    @setElement $('#main table tbody')
     @collection.on 'reset', =>
+      @render()
       @addAll()
     @collection.on 'add', (invoice) =>
       @addOne(invoice)
   render: ->
-    @$el.html()
+    @$el.empty()
   addOne: (invoice) ->
     view = new InvoiceListView
       model: invoice
-    $('#main').append view.render().el
+    @$el.append view.render().el
   addAll: ->
     invoices.each (invoice) =>
       @addOne invoice

@@ -6,6 +6,7 @@ class User
   include Mongoid::Document
   field :email,               type: String
   field :encrypted_password,  type: String
+  has_many :invoices
   attr_accessor :password, :password_confirmation
   validates_confirmation_of :password
   validates_presence_of :encrypted_password
@@ -40,7 +41,7 @@ class LineItem
   field :unit_price,  type: Float
   embedded_in :invoice
 
-  def total_price
+  def line_price
     self.unit_price * self.quantity
   end
 end
@@ -50,9 +51,25 @@ class Invoice
   include Mongoid::MultiParameterAttributes
   field :date,    type: Date
   field :number,  typw: String
+  belongs_to :user
   embeds_many :line_items
-  accepts_nested_attributes_for :line_items
+  accepts_nested_attributes_for :line_items, allow_destroy: true
   validates_presence_of :date, :number
+
+  def total
+    line_items.reduce(0) { |sum, li| sum + li.line_price }
+  end
+
+  def serializable_hash(opts={})
+    {
+      _id: id,
+      date: date,
+      line_items: line_items,
+      number: number,
+      total: self.total,
+      user_id: user.id
+    }
+  end
 end
 
 module AssetHelpers
@@ -86,16 +103,18 @@ class Voici < Sinatra::Base
   end
 
   get '/' do
-    slim :index, locals: {invoices: all_invoices}
+    bootstrap = {current_user: current_user}
+    bootstrap[:invoices] = current_user.invoices if current_user
+    slim :index, locals: {bootstrap: bootstrap}
   end
 
   get '/invoices' do
-    invoices = Invoice.all
+    invoices = current_user.invoices.all
     deliver invoices
   end
 
   post '/invoices' do
-    invoice = Invoice.new payload
+    invoice = current_user.invoices.new payload
     if invoice.save
       deliver invoice
     else
@@ -121,10 +140,6 @@ class Voici < Sinatra::Base
     else
       raise "Failed to delete invoice"
     end
-  end
-
-  get '/users' do
-    deliver User.all
   end
 
   post '/users' do
@@ -159,7 +174,7 @@ class Voici < Sinatra::Base
 
   # Request
   def payload
-    JSON.parse(request.body.read).symbolize_keys
+    @_payload ||= HashWithIndifferentAccess.new JSON.parse(request.body.read).symbolize_keys
   end
 
   # Response

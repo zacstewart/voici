@@ -1,12 +1,11 @@
 class @Session extends Backbone.Model
   url: '/session'
-  initalize: ->
-    @on 'destroy', =>
-      @clear()
+  destroy: ->
+    super()
+    @clear()
 class @SessionView extends Backbone.View
   initialize: ->
-    @model.on 'all', (trigger, msg) =>
-      console.log trigger,msg
+    @model.on 'all', (trigger) =>
       @render()
   tagName: 'div'
   signInTemplate: _.template($('#sign_in_template').html())
@@ -14,12 +13,12 @@ class @SessionView extends Backbone.View
   events:
     'click a.dropdown-toggle': 'toggleDropdown'
     'submit #new_session': 'signIn'
-    'click #sign_out': 'signOut'
+    'click [href="#sign_out"]': 'signOut'
   render: ->
-    if @model.has('_id')
-      template = @currentUserTemplate
+    template = if @model.has('_id')
+      @currentUserTemplate
     else
-      template = @signInTemplate
+      @signInTemplate
     @$el.html(template(@model.toJSON()))
     this
   signIn: (e) ->
@@ -64,7 +63,6 @@ class @AppRouter extends Backbone.Router
   @baseView = new BaseView()
   @invoicesView = new InvoicesView
     collection: @invoices
-  console.log args.current_user
   @session.set args.current_user
   @invoices.reset args.invoices
   @router = new AppRouter()

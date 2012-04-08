@@ -3,9 +3,6 @@ html
   head
     title Voici
     link rel="stylesheet" href="css/bootstrap.css"
-    script src="javascripts/zepto.js"
-    script src="javascripts/underscore.js"
-    script src="javascripts/backbone.js"
   body#voici
     .container
       .row
@@ -20,6 +17,12 @@ html
         .span3#sidebar
           a#new_invoice_btn href="#new_invoice" class="btn btn-success" New Invoice
         .span9#main
+          table.table.table-bordered.table-striped
+            thead
+              th Inovice #
+              th Date
+              th Total
+            tbody
     script#sign_in_template type="text/html"
       form#new_session.form-inline.pull-right
         input.input-small type="text" name="email" placeholder="Email"
@@ -34,7 +37,9 @@ html
           li
             a href="#sign_out" Sign out
     script#invoice_template type="text/html"
-      div Number: <%= number %>
+      td <%= number %>
+      td <%= date %>
+      td <%= total %>
     script#edit_invoice_template type="text/html"
       form
         .modal
@@ -99,7 +104,4 @@ html
         td <%= line_price %>
     script src="#{{asset_path('application.js')}}"
     javascript:
-      initApp({
-        current_user: #{{current_user.to_json}},
-        invoices: #{{invoices.to_json}}
-      });
+      initApp(#{{bootstrap.to_json}});

@@ -18,6 +18,7 @@ class @EditLineItemView extends Backbone.View
   destroy: (e) ->
     e.preventDefault() if e?
     @model.destroy()
+    @remove()
   close: ->
     @undelegateEvents()
     @remove()
