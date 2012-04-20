@@ -14,15 +14,27 @@ html
               #session.span4
             .clearfix
       .row
-        .span3#sidebar
-          a#new_invoice_btn href="#new_invoice" class="btn btn-success" New Invoice
-        .span9#main
-          table.table.table-bordered.table-striped
-            thead
-              th Inovice #
-              th Date
-              th Total
-            tbody
+        .span2#sidebar
+        .span10#main
+    script#session_sidebar_template type="text/html"
+      a#new_invoice_btn href="#new_invoice" class="btn btn-success" New Invoice
+    script#sessionless_sidebar_template type="text/html"
+      h2 New here?
+      form#new_user
+        input.span2 type="text" name="email" placeholder="Email"
+        input.span2 type="password" name="password" placeholder="Password"
+        input.span2 type="password" name="password_confirmation" placeholder="Again"
+        input.btn.btn-success type="submit" value="Sign up"
+    script#welcome_view type="text/html"
+      .hero-unit
+        h1 Welcome to Voici
+    script#invoice_table_template type="text/html"
+      table.table.table-bordered.table-striped
+        thead
+          th Inovice #
+          th Date
+          th Total
+        tbody
     script#sign_in_template type="text/html"
       form#new_session.form-inline.pull-right
         input.input-small type="text" name="email" placeholder="Email"
@@ -31,7 +43,7 @@ html
     script#current_user_template type="text/html"
       .btn-group.pull-right
         a.btn.dropdown-toggle
-          | <%= email %>
+          | <%= user_email %>
           .caret
         ul.dropdown-menu
           li

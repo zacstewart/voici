@@ -5,9 +5,13 @@ set :logging, :true
 class User
   include Mongoid::Document
   field :email,               type: String
+  field :name,                type: String
+  field :phone,               type: String
+  field :address,             type: String
   field :encrypted_password,  type: String
   has_many :invoices
   attr_accessor :password, :password_confirmation
+  attr_accessible :email
   validates_confirmation_of :password
   validates_presence_of :encrypted_password
 
@@ -23,6 +27,7 @@ class User
   end
 
   def password=(pass)
+    @password = pass
     self.encrypted_password = pass.nil? ? nil : ::BCrypt::Password.create(pass)
   end
 
@@ -46,15 +51,28 @@ class LineItem
   end
 end
 
+class Client
+  include Mongoid::Document
+  field :name,    type: String
+  field :email,   type: String
+  field :phone,   type: String
+  field :address, type: String
+  validates_presence_of :email
+  embedded_in :invoice
+end
+
 class Invoice
   include Mongoid::Document
   include Mongoid::MultiParameterAttributes
   field :date,    type: Date
-  field :number,  typw: String
+  field :number,  type: String
+  field :status,  type: String
   belongs_to :user
+  embeds_one :client
   embeds_many :line_items
-  accepts_nested_attributes_for :line_items, allow_destroy: true
+  accepts_nested_attributes_for :client, :line_items, allow_destroy: true
   validates_presence_of :date, :number
+  after_save :send_if_sent
 
   def total
     line_items.reduce(0) { |sum, li| sum + li.line_price }
@@ -63,12 +81,42 @@ class Invoice
   def serializable_hash(opts={})
     {
       _id: id,
+      user_id: user.id,
       date: date,
-      line_items: line_items,
+      status: status,
       number: number,
-      total: self.total,
-      user_id: user.id
+      total: total,
+      client: client,
+      line_items: line_items,
     }
+  end
+
+  def send_if_sent
+    Resque.enqueue(InvoiceMailer, self.id) if status == 'sent'
+  end
+end
+
+class InvoiceMailer
+  @queue = :invoice_send
+  def self.perform(invoice_id)
+    invoice = Invoice.find(invoice_id)
+    Pony.mail(
+      :to => invoice.client.email,
+      :from => "#{invoice.user.name} <#{invoice.user.email}>",
+      :subject => "Invoice #{invoice.number}",
+      :html_body => Slim::Template.new('views/email.slim').render(invoice),
+      :via => :smtp,
+      :via_options => {
+        :address              => 'smtp.sendgrid.net',
+        :port                 => '587',
+        :enable_starttls_auto => true,
+        :user_name            => ENV['SENDGRID_USERNAME'],
+        :password             => ENV['SENDGRID_PASSWORD'],
+        :authentication       => :plain,
+        :domain               => "herokuapp.com"
+      }
+    )
+    invoice.update_attribute(:status, 'delivered')
   end
 end
 
@@ -100,17 +148,49 @@ class Voici < Sinatra::Base
     def current_user
       warden.user
     end
+
+    def authorize!(level, resource)
+      case level
+      when :public_read
+        return
+      end
+    end
   end
 
   get '/' do
-    bootstrap = {current_user: current_user}
+    bootstrap = {session: {_id: 1, user: current_user}}
     bootstrap[:invoices] = current_user.invoices.all if current_user
     slim :index, locals: {bootstrap: bootstrap}
   end
 
+  # /invoices
   get '/invoices' do
     invoices = current_user.invoices.all
     deliver invoices
+  end
+
+  options '/invoices' do
+    if current_user
+      headers['Allows'] = 'HEAD,GET,POST,OPTIONS'
+    else
+      headers['Allows'] = 'HEAD,GET,OPTIONS'
+    end
+    deliver(
+      'GET' => {
+        descripion: 'Returns a list of invoices for the currently authenticated user.'
+      },
+      'POST' => {
+        description: 'Create a new invoice.',
+        parameters: {
+          'date' => {
+            type: 'string',
+          },
+          'date' => {
+            type: 'date'
+          }
+        }
+      }
+    )
   end
 
   post '/invoices' do
@@ -122,8 +202,11 @@ class Voici < Sinatra::Base
     end
   end
 
+  # /invoices/:invoice_id
   get '/invoices/:invoice_id' do
-    deliver find_invoice
+    invoice = find_invoice
+    authorize! invoice, :read
+    deliver invoice
   end
 
   put '/invoices/:invoice_id' do
@@ -143,11 +226,16 @@ class Voici < Sinatra::Base
   end
 
   post '/users' do
-    user = User.new(payload)
+    user = User.new
+    user.email = payload[:email]
+    user.password = payload[:password]
+    user.password_confirmation = payload[:password_confirmation]
     if user.save
+      warden.set_user(user)
       deliver user
     else
       status 406
+      deliver user.errors
     end
   end
 
@@ -158,7 +246,10 @@ class Voici < Sinatra::Base
 
   post '/session' do
     warden.authenticate! :password
-    deliver current_user
+    deliver(
+      _id: 1,
+      user: current_user
+    )
   end
 
   delete '/session' do

@@ -1,0 +1,20 @@
+doctype html
+html
+  head
+  body
+    | From
+    = user.name
+    table
+      thead
+        tr
+          th Item
+          th Quantity
+          th Unit Price
+          th Line Price
+      tbody
+        - line_items.each do |li|
+          tr
+            td= li.description
+            td= li.quantity
+            td= li.unit_price
+            td= li.line_price
