@@ -126,6 +126,9 @@ module AssetHelpers
   end
 end
 
+uri = URI.parse(ENV['REDISTOGO_URL'])
+Resque.redis = Redis.new(:host => uri.host, :port => uri.port, :password => uri.password)
+
 class Voici < Sinatra::Base
   set :root, File.dirname(__FILE__)
   set :public_folder, File.dirname(__FILE__) + '/static'
