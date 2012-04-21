@@ -116,6 +116,7 @@ class InvoiceMailer
         :domain               => "herokuapp.com"
       }
     )
+    puts "Sent mail!!!"
     invoice.update_attribute(:status, 'delivered')
   end
 end
@@ -126,7 +127,7 @@ module AssetHelpers
   end
 end
 
-uri = URI.parse(ENV['REDISTOGO_URL'])
+uri = URI.parse(ENV['REDISTOGO_URL'] || 'redis://localhost:6379/')
 Resque.redis = Redis.new(:host => uri.host, :port => uri.port, :password => uri.password)
 
 class Voici < Sinatra::Base
