@@ -132,7 +132,7 @@ class Voici < Sinatra::Base
     deliver invoice
   end
 
-  put '/invoices/:invoice_id' do
+  patch '/invoices/:invoice_id' do
     invoice = find_invoice
     authorize! :edit, invoice
     if invoice.update_attributes(params)
