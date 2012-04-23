@@ -1,12 +1,38 @@
+class @InvoicesView extends Backbone.View
+  tagName: 'div'
+  initialize: ->
+    @collection.on 'reset', =>
+      @render()
+      @display()
+    @collection.on 'add', (invoice) =>
+      @addOne(invoice)
+    dispatch.on 'logOut', =>
+      @remove()
+  template: _.template($('#invoice_table_template').html())
+  render: ->
+    @$el.html(@template())
+    @addAll()
+    this
+  display: ->
+    $('#main').html(@$el)
+  addOne: (invoice) ->
+    view = new InvoiceListView
+      model: invoice
+    @$el.find('tbody').append view.render().$el
+  addAll: ->
+    invoices.each (invoice) =>
+      @addOne invoice
 class @InvoiceListView extends Backbone.View
   tagName: 'tr'
   template: _.template $('#invoice_template').html()
   events:
-    'click' : 'show'
+    'click': 'show'
   initialize: ->
     @model.on 'change', =>
       @render()
     @model.on 'destroy', =>
+      @remove()
+    dispatch.on 'logOut', =>
       @remove()
   render: ->
     @$el.html(@template(@model.toJSON()))
@@ -95,20 +121,3 @@ class @EditInvoiceView extends Backbone.View
   newItem: (e) ->
     e.preventDefault()
     @model.lineItems.add new LineItem()
-class @InvoicesView extends Backbone.View
-  initialize: ->
-    @setElement $('#main table tbody')
-    @collection.on 'reset', =>
-      @render()
-      @addAll()
-    @collection.on 'add', (invoice) =>
-      @addOne(invoice)
-  render: ->
-    @$el.empty()
-  addOne: (invoice) ->
-    view = new InvoiceListView
-      model: invoice
-    @$el.append view.render().el
-  addAll: ->
-    invoices.each (invoice) =>
-      @addOne invoice
