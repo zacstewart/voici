@@ -51,7 +51,9 @@ class Voici < Sinatra::Base
   end
 
   before do
-    unless request.path_info =~ /^\/public/ ||
+    unless request.path_info =~ /^\// ||
+      request.path_info =~ /^\/public/ ||
+      request.path_info =~ /^\/docs/ ||
       (request.path_info =~ /^\/users/ && request.request_method == 'POST')
       require_authentication
     end
@@ -330,7 +332,7 @@ class Voici < Sinatra::Base
   end
 
   def require_no_authentication
-    raise "You cannot be authorized to do that!" if current_user?
+    raise "You cannot be authenticated to do that!" if current_user?
   end
 
   def authorize!(level=:read, *resources)
