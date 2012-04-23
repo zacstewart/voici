@@ -122,7 +122,7 @@ Clients are an attribute of invoices. They are an embedded document in an invoic
 In the future, I plan to make them also a first-order resource so that they can be used
 to aggregate invoices. E.g. "three outstanding invoices for Mr X."
 
-To delete an existing client from an invoice set the `_delete` parameter to true.
+To delete an existing client from an invoice set the `_destroy` parameter to true.
 
 ## Schema
 - **name**
@@ -156,7 +156,7 @@ To delete an existing client from an invoice set the `_delete` parameter to true
 Line items are attributes of invoices. They are for one billable "line" on an invoice.
 The total of the invoice equals the sum of each line's unit_price times quantity.
 
-To delete an existing line item from an invoice set the `_delete` parameter to true.
+To delete an existing line item from an invoice set the `_destroy` parameter to true.
 
 ## Schema
 - **description**
