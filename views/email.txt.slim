@@ -1,0 +1,22 @@
+erb:
+  Invoice <%= number %>, <%= date.strftime('%b %-d, %Y') %>
+
+  From
+    <%= user.name %>
+    <% if user.address.present? %><%= user.address %><% end %>
+    <% if user.phone.present? %><%= user.phone %><% end %>
+
+  To
+    <%= client.name %>
+    <% if client.address.present? %><%= client.address %><% end %>
+
+  <% if notes.present? %>Notes:
+    <%= notes %>
+  <% end %>
+
+  Items, Quantity, Unit Price, Line Price
+  <% line_items.each do |li| %>
+  <%= li.description %>, <%= li.quantity %>, <%= li.unit_price %>, <%= li.line_price %>
+  <% end %>
+
+  Total: <%= total %>
