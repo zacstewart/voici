@@ -1,125 +1,7 @@
 require 'bundler'
 Bundler.require
 set :logging, :true
-
-class User
-  include Mongoid::Document
-  field :email,               type: String
-  field :name,                type: String
-  field :phone,               type: String
-  field :address,             type: String
-  field :encrypted_password,  type: String
-  has_many :invoices
-  attr_accessor :password, :password_confirmation
-  attr_accessible :email
-  validates_confirmation_of :password
-  validates_presence_of :encrypted_password
-
-  def self.authenticate(email, pass)
-    self.find_by_email_and_encry
-  end
-
-  def encrypted_password
-    @encrypted_password ||= begin
-      ep = read_attribute(:encrypted_password)
-      ep.nil? ? nil : ::BCrypt::Password.new(ep)
-    end
-  end
-
-  def password=(pass)
-    @password = pass
-    self.encrypted_password = pass.nil? ? nil : ::BCrypt::Password.create(pass)
-  end
-
-  def serializable_hash(opts={})
-    {
-      _id: id,
-      email: email
-    }
-  end
-end
-
-class LineItem
-  include Mongoid::Document
-  field :description, type: String
-  field :quantity,    type: Float
-  field :unit_price,  type: Float
-  embedded_in :invoice
-
-  def line_price
-    self.unit_price * self.quantity
-  end
-end
-
-class Client
-  include Mongoid::Document
-  field :name,    type: String
-  field :email,   type: String
-  field :phone,   type: String
-  field :address, type: String
-  validates_presence_of :email
-  embedded_in :invoice
-end
-
-class Invoice
-  include Mongoid::Document
-  include Mongoid::MultiParameterAttributes
-  field :date,    type: Date
-  field :number,  type: String
-  field :status,  type: String
-  belongs_to :user
-  embeds_one :client
-  embeds_many :line_items
-  accepts_nested_attributes_for :client, :line_items, allow_destroy: true
-  validates_presence_of :date, :number
-  after_save :send_if_sent
-
-  def total
-    line_items.reduce(0) { |sum, li| sum + li.line_price }
-  end
-
-  def serializable_hash(opts={})
-    {
-      _id: id,
-      user_id: user.id,
-      date: date,
-      status: status,
-      number: number,
-      total: total,
-      client: client,
-      line_items: line_items,
-    }
-  end
-
-  def send_if_sent
-    Resque.enqueue(InvoiceMailer, self.id) if status == 'sent'
-  end
-end
-
-class InvoiceMailer
-  @queue = :invoice_send
-  def self.perform(invoice_id)
-    invoice = Invoice.find(invoice_id)
-    Pony.mail(
-      :to => invoice.client.email,
-      :from => "#{invoice.user.name} <#{invoice.user.email}>",
-      :subject => "Invoice #{invoice.number}",
-      :html_body => Slim::Template.new('views/email.slim').render(invoice),
-      :via => :smtp,
-      :via_options => {
-        :address              => 'smtp.sendgrid.net',
-        :port                 => '587',
-        :enable_starttls_auto => true,
-        :user_name            => ENV['SENDGRID_USERNAME'],
-        :password             => ENV['SENDGRID_PASSWORD'],
-        :authentication       => :plain,
-        :domain               => "herokuapp.com"
-      }
-    )
-    puts "Sent mail!!!"
-    invoice.update_attribute(:status, 'delivered')
-  end
-end
+require File.expand_path('../models.rb', __FILE__)
 
 module AssetHelpers
   def asset_path(source)
@@ -129,6 +11,12 @@ end
 
 uri = URI.parse(ENV['REDISTOGO_URL'] || 'redis://localhost:6379/')
 Resque.redis = Redis.new(:host => uri.host, :port => uri.port, :password => uri.password)
+
+class Unauthorized < Exception
+  def code
+    401
+  end
+end
 
 class Voici < Sinatra::Base
   set :root, File.dirname(__FILE__)
@@ -146,6 +34,10 @@ class Voici < Sinatra::Base
     sprockets.context_class.instance_eval { include AssetHelpers }
   end
 
+  error Unauthorized do
+    env['sinatra.error'].message || 'Unauthorized!'
+  end
+
   helpers do
     include AssetHelpers
 
@@ -153,26 +45,44 @@ class Voici < Sinatra::Base
       warden.user
     end
 
-    def authorize!(level, resource)
-      case level
-      when :public_read
-        return
-      end
+    def current_user?
+      current_user.present?
     end
   end
 
+  before do
+    unless request.path_info =~ /^\/public/ ||
+      (request.path_info =~ /^\/users/ && request.request_method == 'POST')
+      require_authentication
+    end
+  end
+
+  # /
+  options '/' do
+    deliver(
+      {
+        methods: {
+          'GET' => {
+            description: "Delivers the static Voici documentation"
+          }
+        }
+      }
+    )
+  end
+
   get '/' do
-    bootstrap = {session: {_id: 1, user: current_user}}
-    bootstrap[:invoices] = current_user.invoices.all if current_user
-    slim :index, locals: {bootstrap: bootstrap}
+    #bootstrap = {session: {_id: 1, user: current_user}}
+    #bootstrap[:invoices] = current_user.invoices.all if current_user?
+    #slim :index, locals: {bootstrap: bootstrap}
+    redirect '/docs'
+  end
+
+  # /doc
+  get '/docs' do
+    slim :docs, :locals => {content: markdown(:docs)}
   end
 
   # /invoices
-  get '/invoices' do
-    invoices = current_user.invoices.all
-    deliver invoices
-  end
-
   options '/invoices' do
     if current_user
       headers['Allows'] = 'HEAD,GET,POST,OPTIONS'
@@ -197,57 +107,205 @@ class Voici < Sinatra::Base
     )
   end
 
+  get '/invoices' do
+    invoices = current_user.invoices.all
+    authorize! :read, invoices
+    deliver invoices
+  end
+
   post '/invoices' do
-    invoice = current_user.invoices.new payload
+    invoice = current_user.invoices.new params
     if invoice.save
+      status 201
       deliver invoice
     else
-      raise "Failed to create invoice"
+      raise "Failed to create invoice: #{invoice.errors.full_messages}"
     end
   end
 
   # /invoices/:invoice_id
   get '/invoices/:invoice_id' do
     invoice = find_invoice
-    authorize! invoice, :read
+    authorize! :read, invoice
     deliver invoice
   end
 
   put '/invoices/:invoice_id' do
-    if find_invoice.update_attributes(payload)
-      deliver find_invoice
+    invoice = find_invoice
+    authorize! :edit, invoice
+    if invoice.update_attributes(params)
+      deliver invoice
     else
       raise "Failed to update invoice"
     end
   end
 
   delete '/invoices/:invoice_id' do
-    if find_invoice.destroy
-      deliver find_invoice
+    invoice = find_invoice
+    authorize! :delete, invoice
+    if invoice.destroy
+      deliver invoice
     else
       raise "Failed to delete invoice"
     end
   end
 
-  post '/users' do
-    user = User.new
-    user.email = payload[:email]
-    user.password = payload[:password]
-    user.password_confirmation = payload[:password_confirmation]
-    if user.save
-      warden.set_user(user)
-      deliver user
+  #get '/invoices/:invoice_id/email.?:format?' do
+    #invoice = find_invoice
+    #authorize! invoice, :read
+    #if params[:format] == 'txt'
+      #Slim::Template.new('views/email.txt.slim').render(invoice)
+    #else
+      #Slim::Template.new('views/email.slim').render(invoice)
+    #end
+  #end
+
+  post '?/invoices/:invoice_id/?events' do
+    invoice = find_invoice
+    result = case params[:type].to_sym
+    when :enqueue   then invoice.enqueue
+    when :delivered then invoice.deliver
+    when :opened    then invoice.read
+    end
+    if result
+      status 200
     else
-      status 406
-      deliver user.errors
+      status 403
+      "Inappropriate event #{params[:type]}"
     end
   end
 
-  post '/unauthenticated/?' do
-    status 401
-    deliver "Not authorized!"
+  # /public/invoices/:invoice_key
+  get '/public/invoices/:invoice_key' do
+    invoice = find_invoice
+    authorize! :public_read, invoice
+    deliver invoice
   end
 
+  # /users
+  options '/users' do
+    headers['Allows'] = 'POST,PUT,DELETE'
+    deliver({
+      methods: {
+        'POST' => {
+          description: 'Register a new account',
+          parameters: {
+            email: {
+              description: 'Your email address',
+              required: true,
+              type: 'string'
+            },
+            password: {
+              description: 'Your password',
+              required: true,
+              type: 'string'
+            },
+            password_confirmation: {
+              description: 'Confirm your password',
+              required: true,
+              type: 'string'
+            },
+            name: {
+              description: 'Your name as you want it to appear on invoices',
+              required: false,
+              type: 'string'
+            },
+            address: {
+              description: "The mailing address you'd like to appear on invoices",
+              required: false,
+              type: 'string'
+            },
+            phone: {
+              description: "The phone number you'd like to appear on invoices",
+              required: false,
+              type: 'string'
+            }
+          }
+        }
+      }
+    })
+  end
+
+  post '/users' do
+    user = User.new(
+      email: payload[:email],
+      password: payload[:password],
+      password_confirmation: payload[:password_confirmation]
+    )
+    if user.save
+      warden.set_user(user)
+      status 201
+      deliver user
+    else
+      status 406
+      deliver user.errors.full_messages
+    end
+  end
+
+  options '/me' do
+    deliver({
+      methods: {
+        'PUT' => {
+          description: 'Modify an existing account',
+          parameters: {
+            email: {
+              description: 'Your email address',
+              required: false,
+              type: 'string'
+            },
+            password: {
+              description: 'Your password',
+              required: false,
+              type: 'string'
+            },
+            password_confirmation: {
+              description: 'Confirm your password',
+              required: 'if password is set',
+              type: 'string'
+            },
+            name: {
+              description: 'Your name as you want it to appear on invoices',
+              required: false,
+              type: 'string'
+            },
+            address: {
+              description: "The mailing address you'd like to appear on invoices",
+              required: false,
+              type: 'string'
+            },
+            phone: {
+              description: "The phone number you'd like to appear on invoices",
+              required: false,
+              type: 'string'
+            }
+          }
+        },
+        'DELETE' => {
+          description: 'Delete an account',
+          parameters: {
+            password: {
+              description: 'Your password',
+              required: true,
+              type: 'string'
+            }
+          }
+        }
+      }
+    })
+  end
+
+  put '/me' do
+  end
+
+  delete '/me' do
+  end
+
+  # /unauthenticated
+  post '/unauthenticated/?' do
+    raise Unauthorized
+  end
+
+  # /session
   post '/session' do
     warden.authenticate! :password
     deliver(
@@ -267,9 +325,34 @@ class Voici < Sinatra::Base
     @_warden ||= env['warden']
   end
 
+  def require_authentication
+    raise Unauthorized unless current_user?
+  end
+
+  def require_no_authentication
+    raise "You cannot be authorized to do that!" if current_user?
+  end
+
+  def authorize!(level=:read, *resources)
+    resources.each do |resource|
+      case resource
+      when Invoice
+        if [:read, :edit, :delete].include? level
+          raise Unauthorized unless resource.user == current_user
+        elsif level == :public_read
+          raise Unauthorized unless params[:invoice_key] == resource.key && resource.publicly_readable?
+        end
+      end
+    end
+  end
+
   # Request
   def payload
-    @_payload ||= HashWithIndifferentAccess.new JSON.parse(request.body.read)
+    @_payload ||= HashWithIndifferentAccess.new JSON.parse(request.body.read) rescue {}
+  end
+
+  def params
+    super.merge(payload)
   end
 
   # Response
@@ -279,9 +362,13 @@ class Voici < Sinatra::Base
   end
 
   # Resources
-
   def find_invoice
     #TODO: access control
-    @_invoice ||= current_user.invoices.find(params[:invoice_id])
+    @_invoice ||=
+      if current_user.present? && params[:invoice_id].present?
+        current_user.invoices.find(params[:invoice_id])
+      elsif params[:invoice_key].present?
+        Invoice.where(key: params[:invoice_key]).first
+      end
   end
 end

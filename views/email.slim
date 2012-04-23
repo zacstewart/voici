@@ -1,20 +1,53 @@
 doctype html
 html
   head
-  body
-    | From
-    = user.name
-    table
-      thead
+  body style="background-color: #f0f0f0; font-family: Helvetica, Arial, Sans-Serif; margin: 0"
+    div style="padding: 20px"
+      table style="border-collapse: collapse; background-color: #fefefe; width: 100%; margin: 0 auto; padding: 0; box-shadow: #999 0px 1px 2px"
         tr
-          th Item
-          th Quantity
-          th Unit Price
-          th Line Price
-      tbody
-        - line_items.each do |li|
+          td colspan="2" style="background-color: #0086c4; padding: 10px 0 10px 10px; margin: 0"
+            h1 style="background-color: #65B9E2; float: right; font-size: 16px; margin: 0; padding: 6px 10px; line-height: 12px; text-shadow: #666 1px 1px 1px"
+              a style="color: #fefefe; text-decoration: none" href="http://voici.herokuapp.com" target="_new"
+                | Voici
+            h1 style="color: #fefefe; float: left; font-size: 36px; line-height: 36px; margin: 0; padding: 0 20px 0 0; text-shadow: #666 1px 1px 1px"
+              | Invoice
+            h2 style="color: #d9eef8; float: left; font-size: 24px; line-height: 24px; margin: 0; padding: 10px 0 0 0; text-shadow: #666 1px 1px 1px"
+              = "##{number}, #{date.strftime('%b %-d, %Y')}"
+        tr
+          td valign="top" style="padding: 5px"
+            p
+              strong From
+            p= user.name
+            - if user.address.present?
+              p= user.address
+            - if user.phone.present?
+              p= user.phone
+          td valign="top" style="padding: 5px"
+            p
+              strong To
+            p= client.name
+            - if client.address.present?
+              p= client.address
+        - if notes.present?
           tr
-            td= li.description
-            td= li.quantity
-            td= li.unit_price
-            td= li.line_price
+            td colspan="2"
+              p= notes
+        tr
+          td colspan="2"
+            table style="width: 100%; border-collapse: collapse"
+              thead
+                tr
+                  th style="border-bottom: 2px solid #999; padding: 5px; text-align: left" Items
+                  th style="border-bottom: 2px solid #999; padding: 5px" Quantity
+                  th style="border-bottom: 2px solid #999; padding: 5px; text-align: right" Unit&nbsp;Price
+                  th style="border-bottom: 2px solid #999; padding: 5px; text-align: right" Line&nbsp;Price
+              tbody
+                - line_items.each do |li|
+                  tr
+                    td style="padding: 5px" width="100%"= li.description
+                    td style="padding: 5px"= li.quantity
+                    td style="padding: 5px; text-align: right"= "$#{li.unit_price}"
+                    td style="padding: 5px; text-align: right"= "$#{li.line_price}"
+                tr
+                  td style="border-top: 1px solid #c0c0c0; padding: 5px" Total
+                  td style="border-top: 1px solid #c0c0c0; padding: 5px; text-align: right" colspan="3"= "$#{total}"
