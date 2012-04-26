@@ -81,7 +81,7 @@ Session management is currently unRESTful :(. I will implement pub/private key a
 - - -
 
 # Invoices
-Resources are stateful and can transition through the following states during their lifecycle: `saved`, `enqueued`, `failed_to_send`, `sent`, `deliered`, `opened`, `settled`.
+Invoices are stateful and can transition through the following states during their lifecycle: `saved`, `enqueued`, `failed_to_send`, `sent`, `deliered`, `opened`, `settled`.
 
 ## List all your invoices
 `GET /invoices`
@@ -125,11 +125,11 @@ Currently, there is no pagination. Be careful!
       "address": "123 Client St, Atlanta, GA 30303",
       "phone": "(404) 555-1234"
     },
-    "line_items_attributes": {
+    "line_items_attributes": [{
       "description": "Cat sitting",
       "quantity": 1,
       "unit_price": 99.99
-    }
+    }]
   }
 </pre>
 
