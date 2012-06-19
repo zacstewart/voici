@@ -73,10 +73,10 @@ class Voici < Sinatra::Base
   end
 
   get '/' do
-    #bootstrap = {session: {_id: 1, user: current_user}}
-    #bootstrap[:invoices] = current_user.invoices.all if current_user?
-    #slim :index, locals: {bootstrap: bootstrap}
-    redirect '/docs'
+    bootstrap = {session: {_id: 1, user: current_user}}
+    bootstrap[:invoices] = current_user.invoices.all if current_user?
+    slim :index, locals: {bootstrap: bootstrap}
+    #redirect '/docs'
   end
 
   # /doc
